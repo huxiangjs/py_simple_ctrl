@@ -3,6 +3,7 @@
 
 from simple_ctrl import simple_ctrl_manager
 from dev_button_led import simple_ctrl_button_led
+from dev_smart_ir import simple_ctrl_smart_ir
 import time
 
 dev_password = { }
@@ -31,12 +32,20 @@ def main():
                     dev.connect()
                     dev_list[dev_id] = dev
                     # with dev:
-                    print('name:', dev.info_get_name())
-                    print('type:', dev.info_get_type())
+                    print(f'name:{dev.info_get_name()}, type:{dev.info_get_type()}')
                     if isinstance(dev, simple_ctrl_button_led):
                         rgb = dev.get_color()
                         print('color:', rgb)
                         dev.set_color((0, 0, 255))
+                    elif isinstance(dev, simple_ctrl_smart_ir):
+                        key_count = dev.get_count()
+                        print('key_count:', key_count)
+                        key_list = [ ]
+                        for i in range(key_count):
+                            key = dev.get_item(i)
+                            print(f'key_name: [{i}] {key}')
+                            key_list.append(key)
+                        dev.tx_send(key_list[0]) # first key
                 except Exception as e:
                     print(e)
             elif event == 'offline':
@@ -44,7 +53,10 @@ def main():
                     dev = dev_list[dev_id]
                     dev.disconnect()
                     del dev_list[dev_id]
-        class_list = [ simple_ctrl_button_led ]
+        class_list = [
+            simple_ctrl_button_led,
+            simple_ctrl_smart_ir
+        ]
         server = simple_ctrl_manager(class_list, on_change)
         server.start()
         while True:
