@@ -413,6 +413,13 @@ class simple_ctrl_control(threading.Thread):
         if self._ping_timer:
             self._ping_timer.join()
 
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.disconnect()
+
 class simple_ctrl_manager:
     '''
     Device manager
@@ -420,7 +427,7 @@ class simple_ctrl_manager:
 
     ALIVE_TIMEOUT = 30
 
-    def __init__(self, on_change=None):
+    def __init__(self, class_list = [], on_change=None):
         self._running = False
         self._on_change = on_change if on_change else lambda _, __ : None
         self._dev_dict = { }
@@ -435,6 +442,7 @@ class simple_ctrl_manager:
         self._alive_timer = None
         self._event_queue = queue.Queue(maxsize=0)
         self._event_thread = threading.Thread(target=self._event_caller)
+        self._class_dict = { c.CLASS_ID : c for c in class_list }
 
     def _event_caller(self):
         '''
@@ -488,7 +496,13 @@ class simple_ctrl_manager:
         with self._dict_lock:
             if id not in self._dev_dict:
                 raise Exception(f'The device is offline: {id}')
-            dev = simple_ctrl_control(self._dev_dict[id], passwd, on_change)
+            dev_info = self._dev_dict[id]
+            if dev_info.class_id in self._class_dict:
+                dev_class = self._class_dict[dev_info.class_id]
+                dev = dev_class(dev_info, passwd, on_change)
+            else:
+                # dev = simple_ctrl_control(dev_info, passwd, on_change)
+                raise Exception('No class available for the device was found')
             return dev
 
     def start(self):

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from simple_ctrl import simple_ctrl_manager
+from dev_button_led import simple_ctrl_button_led
 import time
 
 dev_password = { }
@@ -25,16 +26,29 @@ def main():
                 return
             if event == 'online':
                 dev_passwd = dev_password[dev_id]
-                dev = server.device_factory(dev_id, dev_passwd, lambda x,y : print(x, y))
-                dev.connect()
-                print('name:', dev.info_get_name())
-                print('type:', dev.info_get_type())
-                dev_list[dev_id] = dev
+                try:
+                    dev = server.device_factory(dev_id, dev_passwd, lambda x,y : print(x, y))
+                    dev.connect()
+                    dev_list[dev_id] = dev
+                    # with dev:
+                    print('name:', dev.info_get_name())
+                    print('type:', dev.info_get_type())
+                    if isinstance(dev, simple_ctrl_button_led):
+                        color_dict = dev.get_color()
+                        print('color:', color_dict)
+                        color_dict['red'] = 0
+                        color_dict['green'] = 0
+                        color_dict['blue'] = 255
+                        dev.set_color(color_dict)
+                except Exception as e:
+                    print(e)
             elif event == 'offline':
-                dev = dev_list[dev_id]
-                dev.disconnect()
-                del dev_list[dev_id]
-        server = simple_ctrl_manager(on_change)
+                if dev_id in dev_list:
+                    dev = dev_list[dev_id]
+                    dev.disconnect()
+                    del dev_list[dev_id]
+        class_list = [ simple_ctrl_button_led ]
+        server = simple_ctrl_manager(class_list, on_change)
         server.start()
         while True:
             time.sleep(10)
