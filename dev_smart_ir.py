@@ -51,6 +51,9 @@ class simple_ctrl_smart_ir(simple_ctrl_control):
             raise Exception('Operation Failed')
 
     def get_count(self):
+        '''
+        Get the number of keys
+        '''
         cmd = simple_ctrl_smart_ir.IR_CMD_GET_COUNT.to_bytes(1, 'little')
         response = self.request(cmd)
         self._ir_response_check(cmd, response)
@@ -58,6 +61,9 @@ class simple_ctrl_smart_ir(simple_ctrl_control):
         return key_count
 
     def get_item(self, index):
+        '''
+        Get the key information
+        '''
         cmd = simple_ctrl_smart_ir.IR_CMD_GET_ITEM.to_bytes(1, 'little')
         i = index.to_bytes(4, 'little')
         response = self.request(cmd + i)
@@ -66,24 +72,36 @@ class simple_ctrl_smart_ir(simple_ctrl_control):
         return key_name
 
     def tx_test(self, rx_index):
+        '''
+        Send the key waveform you just learned
+        '''
         cmd = simple_ctrl_smart_ir.IR_CMD_TX_TEST.to_bytes(1, 'little')
         i = rx_index.to_bytes(4, 'little')
         response = self.request(cmd + i)
         self._ir_response_check(cmd, response)
 
     def save(self, rx_index):
+        '''
+        Save the key waveforms you just learned
+        '''
         cmd = simple_ctrl_smart_ir.IR_CMD_SAVE.to_bytes(1, 'little')
         i = rx_index.to_bytes(4, 'little')
         response = self.request(cmd + i)
         self._ir_response_check(cmd, response)
 
     def remove(self, key_name):
+        '''
+        Delete a key
+        '''
         cmd = simple_ctrl_smart_ir.IR_CMD_REMOVE.to_bytes(1, 'little')
         name = key_name.encode('utf-8')
         response = self.request(cmd + name)
         self._ir_response_check(cmd, response)
 
     def tx_send(self, key_name):
+        '''
+        Send the key waveform
+        '''
         cmd = simple_ctrl_smart_ir.IR_CMD_TX_SEND.to_bytes(1, 'little')
         name = key_name.encode('utf-8')
         response = self.request(cmd + name)

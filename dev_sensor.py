@@ -58,6 +58,9 @@ class simple_ctrl_sensor(simple_ctrl_control):
             raise Exception('Operation Failed')
 
     def get_count(self):
+        '''
+        Get the number of sensors
+        '''
         cmd = simple_ctrl_sensor.SENSOR_CMD_GET_COUNT.to_bytes(1, 'little')
         response = self.request(cmd)
         self._sensor_response_check(cmd, response)
@@ -65,6 +68,9 @@ class simple_ctrl_sensor(simple_ctrl_control):
         return sensor_count
 
     def get_item(self, index):
+        '''
+        Get the sensor information
+        '''
         cmd = simple_ctrl_sensor.SENSOR_CMD_GET_ITEM.to_bytes(1, 'little')
         i = index.to_bytes(4, 'little')
         response = self.request(cmd + i)
