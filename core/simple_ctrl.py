@@ -226,7 +226,7 @@ class simple_ctrl_control(threading.Thread):
             logging.info(e)
             self._socket.close()
 
-    def connect(self):
+    def connect(self, timeout=None):
         self._running = True
         # Create socket object (IPv4, TCP)
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -234,6 +234,7 @@ class simple_ctrl_control(threading.Thread):
         port = self._dev_info.port
         # Connect to the server
         logging.info(f'Connecting to {host}:{port}...')
+        self._socket.settimeout(timeout)
         self._socket.connect((host, port))
         self._ping_check()
         super().start()
