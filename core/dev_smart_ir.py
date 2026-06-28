@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from simple_ctrl import simple_ctrl_control
+from .simple_ctrl import simple_ctrl_control
 
 class simple_ctrl_smart_ir(simple_ctrl_control):
     '''

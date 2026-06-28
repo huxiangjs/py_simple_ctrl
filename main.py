@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from simple_ctrl import simple_ctrl_manager
-from dev_button_led import simple_ctrl_button_led
-from dev_smart_ir import simple_ctrl_smart_ir
-from dev_sensor import simple_ctrl_sensor
-from dev_voice_led import simple_ctrl_voice_led
+from core.simple_ctrl import simple_ctrl_manager
+from core.dev_button_led import simple_ctrl_button_led
+from core.dev_smart_ir import simple_ctrl_smart_ir
+from core.dev_sensor import simple_ctrl_sensor
+from core.dev_voice_led import simple_ctrl_voice_led
 import time
 
 dev_password = { }

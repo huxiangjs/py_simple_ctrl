@@ -8,7 +8,7 @@ from datetime import datetime
 import threading
 import time
 import queue
-import crypto
+from . import crypto
 
 _log_name = 'simple_ctrl'
 _broadcast_list = []
