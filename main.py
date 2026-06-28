@@ -34,12 +34,9 @@ def main():
                     print('name:', dev.info_get_name())
                     print('type:', dev.info_get_type())
                     if isinstance(dev, simple_ctrl_button_led):
-                        color_dict = dev.get_color()
-                        print('color:', color_dict)
-                        color_dict['red'] = 0
-                        color_dict['green'] = 0
-                        color_dict['blue'] = 255
-                        dev.set_color(color_dict)
+                        rgb = dev.get_color()
+                        print('color:', rgb)
+                        dev.set_color((0, 0, 255))
                 except Exception as e:
                     print(e)
             elif event == 'offline':
