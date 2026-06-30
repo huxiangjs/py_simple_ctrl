@@ -15,11 +15,15 @@ _broadcast_list = []
 _simple_ctrl_host = '0.0.0.0'
 _simple_ctrl_port = 54542
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format=f'%(asctime)s [%(levelname)s] {_log_name}: %(message)s'
+# Configure logger
+logger = logging.getLogger(_log_name)
+logger.setLevel(logging.INFO)
+logger.propagate = False
+console = logging.StreamHandler()
+console.setFormatter(
+        logging.Formatter(f'%(asctime)s [%(levelname)s] {_log_name}: %(message)s')
 )
+logger.addHandler(console)
 
 # Get information about all network interfaces
 for interface_name in netifaces.interfaces():
@@ -39,7 +43,7 @@ for interface_name in netifaces.interfaces():
             broadcast.append(str(broadcast_part))
         broadcast = '.'.join(broadcast)
         _broadcast_list.append(broadcast)
-        logging.debug(f'find: ip:{ip} netmask:{netmask} broadcast:{broadcast}')
+        logger.debug(f'find: ip:{ip} netmask:{netmask} broadcast:{broadcast}')
 
 class discover_device_info:
     def __init__(self, id, ip, port, class_id, has_password,
@@ -95,7 +99,7 @@ class simple_ctrl_discover(threading.Thread):
         super().start()
 
     def run(self):
-        logging.info(f'Discover server started successfully')
+        logger.info(f'Discover server started successfully')
         # recv loop
         while self._running:
             try:
@@ -104,7 +108,7 @@ class simple_ctrl_discover(threading.Thread):
                 try:
                     message = data.decode('utf-8')
                 except UnicodeDecodeError:
-                    logging.error(f'Decode failed')
+                    logger.error(f'Decode failed')
                     continue
                 if not message:
                     continue
@@ -113,7 +117,7 @@ class simple_ctrl_discover(threading.Thread):
 
                 ip = str(client_address[0])
                 port = int(client_address[1])
-                logging.debug(f'Received message from {ip}:{port}: {message}')
+                logger.debug(f'Received message from {ip}:{port}: {message}')
                 # Process the received data
                 id_length = simple_ctrl_discover.ID_LENGTH
                 prefix_len = simple_ctrl_discover.PREFIX_LEN
@@ -125,21 +129,21 @@ class simple_ctrl_discover(threading.Thread):
                     message[prefix_len + 2 + 2 + 1 + id_length :],
                     datetime.now()
                 )
-                logging.debug(f'Device: {dev_info}')
+                logger.debug(f'Device: {dev_info}')
                 self._on_refresh(dev_info)
             except socket.timeout:
                 # Timeout occurred, continue the loop to check running flag
                 continue
             except Exception as e:
-                logging.error(f'Discover error while receiving data: {e}')
+                logger.error(f'Discover error while receiving data: {e}')
                 break
         self._running = False
-        logging.info('Discover server stopped')
+        logger.info('Discover server stopped')
 
     def _say_hello(self):
         if not self._running:
             return
-        logging.debug(f'Say hello!')
+        logger.debug(f'Say hello!')
         try:
             if self._hello_timer:
                 response = simple_ctrl_discover.SAY.encode('utf-8')
@@ -154,11 +158,11 @@ class simple_ctrl_discover(threading.Thread):
             self._hello_timer = threading.Timer(next_interval, self._say_hello)
             self._hello_timer.start()
         except Exception as e:
-            logging.error(f'Error processing data: {e}')
+            logger.error(f'Error processing data: {e}')
 
     def stop(self):
         self._running = False
-        logging.info('Discover server is stopping...')
+        logger.info('Discover server is stopping...')
         if self._socket:
             self._socket.close()
         if self._hello_timer:
@@ -218,14 +222,14 @@ class simple_ctrl_control(threading.Thread):
                 ok = self._ping(simple_ctrl_control.PING_INTERVAL)
                 if not ok:
                     raise Exception('Ping failed')
-                logging.debug('Ping successfull')
+                logger.debug('Ping successfull')
                 next_interval = simple_ctrl_control.PING_INTERVAL
             else:
                 next_interval = simple_ctrl_control.PING_INTERVAL
             self._ping_timer = threading.Timer(next_interval, self._ping_check)
             self._ping_timer.start()
         except Exception as e:
-            logging.info(e)
+            logger.info(e)
             self._socket.close()
 
     def connect(self, timeout=None):
@@ -233,12 +237,12 @@ class simple_ctrl_control(threading.Thread):
         # Create socket object (IPv4, TCP)
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Connect to the server
-        logging.info(f'Connecting to {self._host}:{self._port}...')
+        logger.info(f'Connecting to {self._host}:{self._port}...')
         self._socket.settimeout(timeout)
         self._socket.connect((self._host, self._port))
         self._ping_check()
         super().start()
-        logging.info('Connected')
+        logger.info('Connected')
 
     def _build(self, type, data):
         '''
@@ -379,7 +383,7 @@ class simple_ctrl_control(threading.Thread):
                 playload = self._socket.recv(playload_len)
                 if len(playload) != playload_len:
                     raise Exception('Unable to receive enough playload data')
-                logging.debug(f'Received: {len(playload)} bytes, type: {playload_type}')
+                logger.debug(f'Received: {len(playload)} bytes, type: {playload_type}')
                 if playload_type == simple_ctrl_control.LOAD_TYPE_PING:
                     self._response['ping'].put(playload)
                 elif playload_type == simple_ctrl_control.LOAD_TYPE_INFO:
@@ -394,7 +398,7 @@ class simple_ctrl_control(threading.Thread):
                 # Timeout occurred, continue the loop to check running flag
                 continue
             except Exception as e:
-                logging.error(f'Control error while receiving data: {e}')
+                logger.error(f'Control error while receiving data: {e}')
                 break
         self._on_change('state', 'exit')
         for item in self._response.values():
@@ -402,7 +406,7 @@ class simple_ctrl_control(threading.Thread):
         self._running = False
         host = self._dev_info.ip
         port = self._dev_info.port
-        logging.info(f'{host}:{port} connection closed')
+        logger.info(f'{host}:{port} connection closed')
 
     def disconnect(self):
         self._running = False
@@ -413,7 +417,7 @@ class simple_ctrl_control(threading.Thread):
         self.join()
         if self._ping_timer:
             self._ping_timer.join()
-        logging.info(f'{self._host}:{self._port} disconnected')
+        logger.info(f'{self._host}:{self._port} disconnected')
 
     def __enter__(self):
         self.connect()
@@ -459,7 +463,7 @@ class simple_ctrl_manager:
                 self._event_queue.task_done()
             except queue.Empty:
                 continue
-        logging.debug('Caller exited')
+        logger.debug('Caller exited')
 
     def _alive_check(self):
         if not self._running:
@@ -476,7 +480,7 @@ class simple_ctrl_manager:
                     del_list.append(k)
                 for k in del_list:
                     del self._dev_dict[k]
-            logging.debug('Liveness check')
+            logger.debug('Liveness check')
             next_interval = 1
         else:
             next_interval = 0
