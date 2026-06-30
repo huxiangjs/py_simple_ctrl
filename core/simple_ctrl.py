@@ -195,6 +195,8 @@ class simple_ctrl_control(threading.Thread):
         self._running = False
         self._on_change = on_change if on_change else lambda _ : None
         self._dev_info = info
+        self._host = info.ip
+        self._port = info.port
         passwd_bytes = passwd.encode('utf-8')
         need_len = simple_ctrl_control.ACCESS_KEY_LENGTH
         actual_len = len(passwd_bytes)
@@ -230,12 +232,10 @@ class simple_ctrl_control(threading.Thread):
         self._running = True
         # Create socket object (IPv4, TCP)
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        host = self._dev_info.ip
-        port = self._dev_info.port
         # Connect to the server
-        logging.info(f'Connecting to {host}:{port}...')
+        logging.info(f'Connecting to {self._host}:{self._port}...')
         self._socket.settimeout(timeout)
-        self._socket.connect((host, port))
+        self._socket.connect((self._host, self._port))
         self._ping_check()
         super().start()
         logging.info('Connected')
@@ -413,6 +413,7 @@ class simple_ctrl_control(threading.Thread):
         self.join()
         if self._ping_timer:
             self._ping_timer.join()
+        logging.info(f'{self._host}:{self._port} disconnected')
 
     def __enter__(self):
         self.connect()
