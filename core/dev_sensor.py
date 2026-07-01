@@ -36,17 +36,17 @@ class simple_ctrl_sensor(simple_ctrl_control):
                 if sensor_type == simple_ctrl_sensor.SENSOR_TYPE_BRIGHTNESS:
                     type_str = self._type_dict[sensor_type]
                     data_unit = 'lx'
-                    on_change(type_str, (sensor_id, data, data_unit))
+                    on_change(type_str, {sensor_id: (data, data_unit)})
                 elif sensor_type == simple_ctrl_sensor.SENSOR_TYPE_HUMIDITY:
                     type_str = self._type_dict[sensor_type]
                     data /= 10
                     data_unit = '%RH'
-                    on_change(type_str, (sensor_id, data, data_unit))
+                    on_change(type_str, {sensor_id: (data, data_unit)})
                 elif sensor_type == simple_ctrl_sensor.SENSOR_TYPE_TEMPERATURE:
                     type_str = self._type_dict[sensor_type]
                     data /= 10
                     data_unit = '℃'
-                    on_change(type_str, (sensor_id, data, data_unit))
+                    on_change(type_str, {sensor_id: (data, data_unit)})
             else:
                 on_change(event, data)
         super().__init__(info, passwd, led_on_change)
