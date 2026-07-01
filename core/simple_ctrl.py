@@ -89,7 +89,7 @@ class simple_ctrl_discover(threading.Thread):
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         # Set timeout to avoid blocking indefinitely
         # This allows the server to check the running flag periodically
-        # self._socket.settimeout(1.0)
+        self._socket.settimeout(1.0)
         # Bind to the specified address and port
         self._socket.bind((_simple_ctrl_host, _simple_ctrl_port))
 
