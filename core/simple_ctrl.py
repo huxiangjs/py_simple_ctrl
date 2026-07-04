@@ -445,9 +445,13 @@ class simple_ctrl_manager:
         def on_refresh(info):
             with self._dict_lock:
                 new_dev = info.id not in self._dev_dict
+                if not new_dev:
+                    new_name = info.name != self._dev_dict[info.id].name
                 self._dev_dict[info.id] = info
                 if new_dev:
                     self._event_queue.put(['online', info]) # dev online
+                elif new_name:
+                    self._event_queue.put(['name_change', info])
         self._discover = simple_ctrl_discover(on_refresh)
         self._alive_timer = None
         self._event_queue = queue.Queue(maxsize=0)
