@@ -12,8 +12,6 @@ from . import crypto
 
 _log_name = 'simple_ctrl'
 _broadcast_list = []
-_simple_ctrl_host = '0.0.0.0'
-_simple_ctrl_port = 54542
 
 # Configure logger
 logger = logging.getLogger(_log_name)
@@ -75,6 +73,10 @@ class simple_ctrl_discover(threading.Thread):
     BUFSIZE = 1024
     PREFIX_LEN = len(RESPOND)
 
+    UDP_HOST = '0.0.0.0'
+    UDP_SEND_PORT = 54542
+    UDP_RECV_PORT = 54543
+
     def __init__(self, on_refresh=None):
         super().__init__()
         self._running = False
@@ -91,7 +93,7 @@ class simple_ctrl_discover(threading.Thread):
         # This allows the server to check the running flag periodically
         self._socket.settimeout(1.0)
         # Bind to the specified address and port
-        self._socket.bind((_simple_ctrl_host, _simple_ctrl_port))
+        self._socket.bind((simple_ctrl_discover.UDP_HOST, simple_ctrl_discover.UDP_RECV_PORT))
 
     def start(self):
         self._running = True
@@ -149,7 +151,7 @@ class simple_ctrl_discover(threading.Thread):
                 response = simple_ctrl_discover.SAY.encode('utf-8')
                 for _ in range(5):
                     for item in _broadcast_list:
-                        address = (item, _simple_ctrl_port)
+                        address = (item, simple_ctrl_discover.UDP_SEND_PORT)
                         self._socket.sendto(response, address)
                     time.sleep(0.1)
                 next_interval = simple_ctrl_discover.INTERVAL
@@ -176,6 +178,8 @@ class simple_ctrl_control(threading.Thread):
     Device control
     '''
 
+    TCP_PORT = 54542
+
     LOAD_TYPE_PING = 0x00
     LOAD_TYPE_INFO = 0x01
     LOAD_TYPE_REQUEST = 0x02
@@ -200,7 +204,7 @@ class simple_ctrl_control(threading.Thread):
         self._on_change = on_change if on_change else lambda _ : None
         self._dev_info = info
         self._host = info.ip
-        self._port = info.port
+        self._port = simple_ctrl_control.TCP_PORT
         passwd_bytes = passwd.encode('utf-8')
         need_len = simple_ctrl_control.ACCESS_KEY_LENGTH
         actual_len = len(passwd_bytes)
