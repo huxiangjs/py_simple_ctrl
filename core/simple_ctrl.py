@@ -11,7 +11,6 @@ import queue
 from . import crypto
 
 _log_name = 'simple_ctrl'
-_broadcast_list = []
 
 # Configure logger
 logger = logging.getLogger(_log_name)
@@ -23,25 +22,69 @@ console.setFormatter(
 )
 logger.addHandler(console)
 
-# Get information about all network interfaces
-for interface_name in netifaces.interfaces():
-    addrs = netifaces.ifaddresses(interface_name)
-    if netifaces.AF_INET not in addrs:
-        continue
-    for addr_info in addrs[netifaces.AF_INET]:
-        ip = addr_info.get('addr')
-        netmask = addr_info.get('netmask')
-        if ip and netmask and ip.startswith('127.'):
-            continue
-        ip_split = ip.split('.')
-        mask_split = netmask.split('.')
-        broadcast = []
-        for i in range(4):
-            broadcast_part = int(ip_split[i]) | (~int(mask_split[i]) & 0xff)
-            broadcast.append(str(broadcast_part))
-        broadcast = '.'.join(broadcast)
-        _broadcast_list.append(broadcast)
-        logger.debug(f'find: ip:{ip} netmask:{netmask} broadcast:{broadcast}')
+class interface_state(threading.Thread):
+    '''Network interface state'''
+
+    def __init__(self, interval=5, on_change=None):
+        super().__init__()
+        self._interval = interval
+        self._on_change = on_change if on_change else lambda _ : None
+        self._stop_event = threading.Event()
+        self._broadcast_list = []
+        self._broadcast_list_lock = threading.Lock()
+        self._scan()
+
+    def _scan(self, check=False):
+        ''' Get information about all network interfaces'''
+        new_list = [ ]
+        for interface_name in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(interface_name)
+            if netifaces.AF_INET not in addrs:
+                continue
+            for addr_info in addrs[netifaces.AF_INET]:
+                ip = addr_info.get('addr')
+                netmask = addr_info.get('netmask')
+                if ip and netmask and ip.startswith('127.'):
+                    continue
+                ip_split = ip.split('.')
+                mask_split = netmask.split('.')
+                broadcast = []
+                for i in range(4):
+                    broadcast_part = int(ip_split[i]) | (~int(mask_split[i]) & 0xff)
+                    broadcast.append(str(broadcast_part))
+                broadcast = '.'.join(broadcast)
+                new_list.append(broadcast)
+                logger.debug(f'find: ip:{ip} netmask:{netmask} broadcast:{broadcast}')
+        with self._broadcast_list_lock:
+            old_list = self._broadcast_list
+            self._broadcast_list = new_list
+        if check:
+            changed = False
+            if len(old_list) != len(new_list):
+                changed = True
+            else:
+                for item in new_list:
+                    if item in old_list:
+                        continue
+                    changed = True
+                    break
+            if changed:
+                self._on_change(new_list)
+
+    @property
+    def broadcast_list(self):
+        with self._broadcast_list_lock:
+            return self._broadcast_list
+
+    def run(self):
+        while True:
+            if self._stop_event.wait(self._interval):
+                break
+            self._scan(True)
+
+    def stop(self):
+        self._stop_event.set()
+        self.join()
 
 class discover_device_info:
     def __init__(self, id, ip, port, class_id, has_password,
@@ -81,32 +124,46 @@ class simple_ctrl_discover(threading.Thread):
         super().__init__()
         self._running = False
         self._socket = None
+        self._socket_lock = threading.Lock()
         self._hello_timer = None
+        def on_change(_):
+            logger.info(f'The network status has changed')
+            self.socket_init()
+        self._interface_state = interface_state(on_change=on_change)
         self._on_refresh = on_refresh if on_refresh else lambda _ : None
-        # Create UDP socket
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Set socket option to allow address reuse (useful for quick restarts)
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # Allow socket broadcasting
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        # Set timeout to avoid blocking indefinitely
-        # This allows the server to check the running flag periodically
-        self._socket.settimeout(1.0)
-        # Bind to the specified address and port
-        self._socket.bind((simple_ctrl_discover.UDP_HOST, simple_ctrl_discover.UDP_RECV_PORT))
+        self.socket_init()
+
+    def socket_init(self):
+        if self._socket:
+            self._socket.close()
+        with self._socket_lock:
+            # Create UDP socket
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # Set socket option to allow address reuse (useful for quick restarts)
+            self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # Allow socket broadcasting
+            self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            # Set timeout to avoid blocking indefinitely
+            # This allows the server to check the running flag periodically
+            self._socket.settimeout(1.0)
+            # Bind to the specified address and port
+            self._socket.bind((simple_ctrl_discover.UDP_HOST, simple_ctrl_discover.UDP_RECV_PORT))
 
     def start(self):
         self._running = True
         self._say_hello()
         super().start()
+        self._interface_state.start()
 
     def run(self):
         logger.info(f'Discover server started successfully')
         # recv loop
         while self._running:
             try:
+                with self._socket_lock:
+                    _socket = self._socket
                 # Receive data from any client
-                data, client_address = self._socket.recvfrom(simple_ctrl_discover.BUFSIZE)
+                data, client_address = _socket.recvfrom(simple_ctrl_discover.BUFSIZE)
                 try:
                     message = data.decode('utf-8')
                 except UnicodeDecodeError:
@@ -138,35 +195,37 @@ class simple_ctrl_discover(threading.Thread):
                 continue
             except Exception as e:
                 logger.error(f'Discover error while receiving data: {e}')
-                break
-        self._running = False
         logger.info('Discover server stopped')
 
     def _say_hello(self):
         if not self._running:
             return
-        logger.debug(f'Say hello!')
-        try:
-            if self._hello_timer:
+        if self._hello_timer:
+            logger.debug(f'Say hello!')
+            try:
                 response = simple_ctrl_discover.SAY.encode('utf-8')
+                with self._socket_lock:
+                    _socket = self._socket
                 for _ in range(5):
-                    for item in _broadcast_list:
+                    for item in self._interface_state.broadcast_list:
                         address = (item, simple_ctrl_discover.UDP_SEND_PORT)
-                        self._socket.sendto(response, address)
+                        _socket.sendto(response, address)
                     time.sleep(0.1)
-                next_interval = simple_ctrl_discover.INTERVAL
-            else:
-                next_interval = 0
-            self._hello_timer = threading.Timer(next_interval, self._say_hello)
-            self._hello_timer.start()
-        except Exception as e:
-            logger.error(f'Error processing data: {e}')
+            except Exception as e:
+                logger.error(f'Error processing data: {e}')
+            next_interval = simple_ctrl_discover.INTERVAL
+        else:
+            next_interval = 0
+        self._hello_timer = threading.Timer(next_interval, self._say_hello)
+        self._hello_timer.start()
 
     def stop(self):
         self._running = False
         logger.info('Discover server is stopping...')
-        if self._socket:
-            self._socket.close()
+        self._interface_state.stop()
+        with self._socket_lock:
+            if self._socket:
+                self._socket.close()
         if self._hello_timer:
             self._hello_timer.cancel()
         self.join()
