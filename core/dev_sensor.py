@@ -13,6 +13,8 @@ class simple_ctrl_sensor(simple_ctrl_control):
     SENSOR_TYPE_BRIGHTNESS = 0x01
     SENSOR_TYPE_HUMIDITY = 0x02
     SENSOR_TYPE_TEMPERATURE = 0x03
+    SENSOR_TYPE_TVOC = 0x04
+    SENSOR_TYPE_CO2EQ = 0x05
 
     SENSOR_CMD_GET_COUNT = 0x00
     SENSOR_CMD_GET_ITEM = 0x01
@@ -24,7 +26,9 @@ class simple_ctrl_sensor(simple_ctrl_control):
         self._type_dict = {
             simple_ctrl_sensor.SENSOR_TYPE_BRIGHTNESS : 'brightness',
             simple_ctrl_sensor.SENSOR_TYPE_HUMIDITY : 'humidity',
-            simple_ctrl_sensor.SENSOR_TYPE_TEMPERATURE : 'temperature'
+            simple_ctrl_sensor.SENSOR_TYPE_TEMPERATURE : 'temperature',
+            simple_ctrl_sensor.SENSOR_TYPE_TVOC : 'VOC',
+            simple_ctrl_sensor.SENSOR_TYPE_CO2EQ : 'CO2'
         }
         def led_on_change(event, data):
             if not on_change:
@@ -46,6 +50,14 @@ class simple_ctrl_sensor(simple_ctrl_control):
                     type_str = self._type_dict[sensor_type]
                     data /= 10
                     data_unit = '℃'
+                    on_change(type_str, {sensor_id: (data, data_unit)})
+                elif sensor_type == simple_ctrl_sensor.SENSOR_TYPE_TVOC:
+                    type_str = self._type_dict[sensor_type]
+                    data_unit = 'ppb'
+                    on_change(type_str, {sensor_id: (data, data_unit)})
+                elif sensor_type == simple_ctrl_sensor.SENSOR_TYPE_CO2EQ:
+                    type_str = self._type_dict[sensor_type]
+                    data_unit = 'ppm'
                     on_change(type_str, {sensor_id: (data, data_unit)})
             else:
                 on_change(event, data)
